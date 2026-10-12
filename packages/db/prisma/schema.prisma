@@ -1,0 +1,304 @@
+// This is your Prisma schema file for Hulu Academy
+// Database: Supabase PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  STUDENT
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ReferralLinkStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum ReferralStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  REVOKED
+}
+
+enum ReferralEventType {
+  JOIN
+  LEAVE
+  REJOIN
+  INVALIDATE
+  MANUAL_ADJUSTMENT
+}
+
+enum EntitlementStatus {
+  ACTIVE
+  REVOKED
+  EXPIRED
+}
+
+enum EntitlementSource {
+  REFERRAL_20
+  ADMIN_GRANT
+  OTHER
+}
+
+enum ProductType {
+  TUTORIAL_PACKAGE
+  COURSE_BUNDLE
+  SINGLE_COURSE
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum MaterialStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// ─────────────────────────────────────────────
+// Users
+// ─────────────────────────────────────────────
+
+model User {
+  id             String     @id @default(uuid())
+  telegramUserId BigInt     @unique @map("telegram_user_id")
+  username       String?
+  firstName      String?    @map("first_name")
+  lastName       String?    @map("last_name")
+  languageCode   String?    @map("language_code")
+  role           UserRole   @default(STUDENT)
+  status         UserStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now()) @map("created_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  lastSeenAt     DateTime?  @map("last_seen_at")
+
+  // Relations
+  referralLinks      ReferralLink[]
+  referralsAsReferrer Referral[]    @relation("ReferrerRelation")
+  referralsAsReferred Referral[]    @relation("ReferredRelation")
+  entitlements       Entitlement[]
+  adminAuditLogs     AdminAuditLog[]
+  sessions           Session[]
+
+  @@index([telegramUserId])
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// Sessions (JWT refresh token tracking)
+// ─────────────────────────────────────────────
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────
+// Referral Links
+// ─────────────────────────────────────────────
+
+model ReferralLink {
+  id               String             @id @default(uuid())
+  ownerUserId      String             @map("owner_user_id")
+  telegramInviteId String?            @map("telegram_invite_id")
+  inviteUrl        String             @unique @map("invite_url")
+  status           ReferralLinkStatus @default(ACTIVE)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  owner    User       @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  referrals Referral[]
+
+  @@index([ownerUserId])
+  @@index([inviteUrl])
+  @@index([status])
+  @@map("referral_links")
+}
+
+// ─────────────────────────────────────────────
+// Referrals
+// CRITICAL: referred_user_id is UNIQUE — one credit per Telegram account globally
+// ─────────────────────────────────────────────
+
+model Referral {
+  id                  String         @id @default(uuid())
+  referrerUserId      String         @map("referrer_user_id")
+  referredUserId      String         @unique @map("referred_user_id") // ONE referral credit per account
+  referralLinkId      String         @map("referral_link_id")
+  telegramJoinEventId String?        @map("telegram_join_event_id")
+  status              ReferralStatus @default(PENDING)
+  verifiedAt          DateTime?      @map("verified_at")
+  rejectionReason     String?        @map("rejection_reason")
+  isSuspicious        Boolean        @default(false) @map("is_suspicious")
+  suspicionReason     String?        @map("suspicion_reason")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  referrer     User         @relation("ReferrerRelation", fields: [referrerUserId], references: [id])
+  referred     User         @relation("ReferredRelation", fields: [referredUserId], references: [id])
+  referralLink ReferralLink @relation(fields: [referralLinkId], references: [id])
+
+  @@index([referrerUserId])
+  @@index([referredUserId])
+  @@index([status])
+  @@index([referrerUserId, status])
+  @@index([createdAt])
+  @@map("referrals")
+}
+
+// ─────────────────────────────────────────────
+// Referral Events (immutable audit log)
+// CRITICAL: telegram_update_id UNIQUE ensures idempotent webhook processing
+// ─────────────────────────────────────────────
+
+model ReferralEvent {
+  id               String            @id @default(uuid())
+  telegramUpdateId BigInt            @unique @map("telegram_update_id")
+  eventType        ReferralEventType @map("event_type")
+  telegramUserId   BigInt            @map("telegram_user_id")
+  telegramChatId   BigInt            @map("telegram_chat_id")
+  referralLinkId   String?           @map("referral_link_id")
+  referrerUserId   String?           @map("referrer_user_id")
+  rawEventHash     String?           @map("raw_event_hash")
+  metadataJson     Json              @default("{}") @map("metadata_json")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  @@index([telegramUpdateId])
+  @@index([telegramUserId])
+  @@index([telegramChatId])
+  @@index([referralLinkId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("referral_events")
+}
+
+// ─────────────────────────────────────────────
+// Products
+// ─────────────────────────────────────────────
+
+model Product {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  type        ProductType   @default(TUTORIAL_PACKAGE)
+  status      ProductStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  materials    Material[]
+  entitlements Entitlement[]
+
+  @@index([status])
+  @@map("products")
+}
+
+// ─────────────────────────────────────────────
+// Materials
+// ─────────────────────────────────────────────
+
+model Material {
+  id            String         @id @default(uuid())
+  productId     String         @map("product_id")
+  title         String
+  description   String?
+  storageKey    String?        @map("storage_key")
+  telegramFileId String?       @map("telegram_file_id")
+  fileType      String?        @map("file_type") // pdf, video, image, doc, ppt
+  fileSizeBytes BigInt?        @map("file_size_bytes")
+  sortOrder     Int            @default(0) @map("sort_order")
+  status        MaterialStatus @default(ACTIVE)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([sortOrder])
+  @@index([status])
+  @@map("materials")
+}
+
+// ─────────────────────────────────────────────
+// Entitlements
+// CRITICAL: UNIQUE(user_id, product_id) prevents duplicate grants
+// ─────────────────────────────────────────────
+
+model Entitlement {
+  id        String            @id @default(uuid())
+  userId    String            @map("user_id")
+  productId String            @map("product_id")
+  status    EntitlementStatus @default(ACTIVE)
+  source    EntitlementSource @default(REFERRAL_20)
+  grantedAt DateTime          @default(now()) @map("granted_at")
+  expiresAt DateTime?         @map("expires_at") // null = permanent
+  revokeReason String?        @map("revoke_reason")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@unique([userId, productId]) // Prevents duplicate entitlements
+  @@index([userId])
+  @@index([productId])
+  @@index([status])
+  @@map("entitlements")
+}
+
+// ─────────────────────────────────────────────
+// Admin Audit Logs
+// ─────────────────────────────────────────────
+
+model AdminAuditLog {
+  id           String   @id @default(uuid())
+  adminUserId  String   @map("admin_user_id")
+  action       String
+  targetType   String?  @map("target_type")
+  targetId     String?  @map("target_id")
+  reason       String
+  metadataJson Json     @default("{}") @map("metadata_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  admin User @relation(fields: [adminUserId], references: [id])
+
+  @@index([adminUserId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+  @@map("admin_audit_logs")
+}

@@ -1,0 +1,31 @@
+{
+  "name": "hulu-academy",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r test:integration",
+    "test:e2e": "pnpm -r test:e2e",
+    "tunnel:cloudflare": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-cloudflare-tunnel.ps1",
+    "db:generate": "pnpm --filter @hulu/db db:generate",
+    "db:migrate": "pnpm --filter @hulu/db db:migrate",
+    "db:push": "pnpm --filter @hulu/db db:push",
+    "db:seed": "pnpm --filter @hulu/db db:seed",
+    "db:studio": "pnpm --filter @hulu/db db:studio"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0"
+  }
+}

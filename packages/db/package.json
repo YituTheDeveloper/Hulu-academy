@@ -1,0 +1,30 @@
+{
+  "name": "@hulu/db",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:seed": "tsx src/seed.ts",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "^7.0.0",
+    "pg": "8.15.0"
+  },
+  "devDependencies": {
+    "@prisma/config": "^7.10.0",
+    "dotenv": "^16.6.1",
+    "prisma": "^7.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^7.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

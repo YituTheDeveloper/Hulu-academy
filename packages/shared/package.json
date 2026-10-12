@@ -1,0 +1,14 @@
+{
+  "name": "@hulu/shared",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

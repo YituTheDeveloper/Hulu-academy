@@ -1,0 +1,36 @@
+# ------ Dependencies -------------------------
+node_modules/
+.pnpm-store/
+package-lock.json
+
+# ------ Build outputs ------------------------
+dist/
+.next/
+out/
+build/
+
+# ------ Environment --------------------------
+.env*
+!.env.example
+
+# ------ Local tunnel binary -------------------
+cloudflared.exe
+cloudflare.exe
+
+# ------ Editor / OS --------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+
+# ------ Logs ---------------------------------
+*.log
+logs/
+
+# ------ Testing ------------------------------
+coverage/
+playwright-report/
+test-results/
+
+# ------ Misc ---------------------------------
+*.tsbuildinfo

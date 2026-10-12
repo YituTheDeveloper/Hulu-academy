@@ -1,0 +1,22 @@
+{
+  "name": "@hulu/bot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "grammy": "latest",
+    "@hulu/db": "workspace:*",
+    "@hulu/telegram": "workspace:*",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^7.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
