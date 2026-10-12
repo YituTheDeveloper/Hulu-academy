@@ -2,6 +2,104 @@ import { NextRequest, NextResponse } from 'next/server'
 import { TelegramUpdateSchema } from '@hulu/validation'
 import { processWebhookUpdate } from '@/lib/referral-service'
 
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
+type TelegramMessage = {
+  chat?: { id?: unknown; type?: unknown }
+  text?: unknown
+}
+
+function parseBotCommand(message: unknown) {
+  if (!message || typeof message !== 'object') return null
+
+  const { chat, text } = message as TelegramMessage
+  if (
+    !chat ||
+    typeof chat.id !== 'number' ||
+    !Number.isSafeInteger(chat.id) ||
+    typeof chat.type !== 'string' ||
+    typeof text !== 'string'
+  ) {
+    return null
+  }
+
+  const commandToken = text.trim().split(/\s+/, 1)[0]?.toLowerCase()
+  const match = commandToken?.match(/^\/(start|help)(?:@[a-z0-9_]+)?$/i)
+  if (!match) return null
+
+  return { chatId: chat.id, chatType: chat.type, command: match[1] as 'start' | 'help' }
+}
+
+function getMiniAppUrl() {
+  try {
+    const url = new URL((process.env.MINI_APP_URL || process.env.APP_URL || '').trim())
+    return url.protocol === 'https:' ? url.toString().replace(/\/$/, '') : null
+  } catch {
+    return null
+  }
+}
+
+async function replyToBotCommand(
+  chatId: number,
+  chatType: string,
+  command: 'start' | 'help',
+) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  if (!botToken) throw new Error('TELEGRAM_BOT_TOKEN is not configured')
+
+  const miniAppUrl = getMiniAppUrl()
+  const startText =
+    `🎓 <b>Welcome to Hulu Academy!</b>\n\n` +
+    `Freshman Second Semester Class is now live! 🌟\n\n` +
+    `<b>What we offer:</b>\n` +
+    `✅ High quality 4K Video Lectures\n` +
+    `✅ PDF Notes in Amharic & English\n` +
+    `✅ 4+ Years Past Exams with Solutions\n` +
+    `✅ Chapter-wise Quizzes & Summaries\n\n` +
+    `<b>Supported Departments:</b>\n` +
+    `🟢 Pre-Engineering | Pre-Health | Natural Science | Social Science\n\n` +
+    `🏆 <b>SPECIAL REFERRAL PROGRAM:</b>\n` +
+    `Invite <b>20 verified freshman classmates</b> into our official channel using your unique link, and unlock the <b>ENTIRE Year 1 • Semester 2 Full Package</b> for FREE!\n\n` +
+    (miniAppUrl ? `Tap below to open your referral dashboard:` : `The referral dashboard is temporarily unavailable.`)
+  const helpText =
+    `ℹ️ <b>Hulu Academy Help & Rules</b>\n\n` +
+    `<b>How referrals work:</b>\n` +
+    `1. Open the Mini App to get your unique referral invite link.\n` +
+    `2. Share your link with freshman classmates.\n` +
+    `3. When a classmate joins the official channel via your link, Telegram verifies their membership.\n` +
+    `4. Your verified referral count increases by 1.\n` +
+    `5. Reach 20 verified referrals to automatically unlock all course materials!\n\n` +
+    `⚠️ <i>Referral links count when the user joins the channel; clicks alone do not count.</i>`
+
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    text: command === 'start' ? startText : helpText,
+    parse_mode: 'HTML',
+  }
+
+  if (command === 'start' && miniAppUrl && chatType === 'private') {
+    body.reply_markup = {
+      inline_keyboard: [[{
+        text: '🎓 Open Referral Dashboard',
+        web_app: { url: miniAppUrl },
+      }]],
+    }
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(8_000),
+  })
+  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string } | null
+
+  if (!response.ok || !result?.ok) {
+    throw new Error(`Telegram sendMessage failed: ${result?.description || response.status}`)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Validate webhook secret token
@@ -26,7 +124,13 @@ export async function POST(req: NextRequest) {
 
     const update = parsed.data
 
-    // Only process chat_member updates (channel join/leave events)
+    const command = parseBotCommand(update.message)
+    if (command) {
+      await replyToBotCommand(command.chatId, command.chatType, command.command)
+      return NextResponse.json({ ok: true, action: command.command })
+    }
+
+    // Process channel join/leave events. Other update types need no action.
     if (!update.chat_member) {
       return NextResponse.json({ ok: true })
     }
@@ -48,7 +152,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`Webhook result: ${result.action} — ${result.message}`)
 
-    // Ask the polling bot or Telegram to retry on a transient processing error.
+    // Ask Telegram to retry on a transient processing error.
     if (result.action === 'ERROR') {
       return NextResponse.json({ ok: false }, { status: 500 })
     }

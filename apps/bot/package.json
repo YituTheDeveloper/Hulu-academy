@@ -6,6 +6,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "set-webhook": "tsx src/set-webhook.ts",
+    "delete-webhook": "tsx src/set-webhook.ts --delete",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

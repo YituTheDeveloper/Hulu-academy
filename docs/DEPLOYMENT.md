@@ -71,20 +71,26 @@ Use one update-delivery mode at a time.
 
 ### Local development: bot polling
 
-The local bot in `apps/bot/src/index.ts` uses Telegram long polling for `chat_member` updates and forwards them to the Mini App at `MINI_APP_URL/api/webhooks/telegram`. Keep the bot, Mini App, and Cloudflare Tunnel running while testing. Do not register Telegram's direct webhook at the same time; Telegram does not allow long polling while a webhook is active. If this bot was previously configured with a webhook, remove it (preserving pending updates) before starting the local polling bot. `getWebhookInfo` should report an empty `url` for polling mode.
-
-### Production: Vercel Mini App plus a persistent bot worker
-
-Deploy `apps/mini-app` to Vercel. Run `apps/bot` as a persistent Node.js worker on a service that keeps processes running, such as Render, Railway, or a VPS. The bot uses long polling for `/start`, `/help`, and channel-member updates. For referral joins, it forwards `chat_member` updates to the Mini App's `/api/webhooks/telegram` endpoint.
-
-Configure the bot worker with `TELEGRAM_BOT_TOKEN`, `MINI_APP_URL` (the production Vercel URL), and `TELEGRAM_WEBHOOK_SECRET`. Set the same `TELEGRAM_WEBHOOK_SECRET` in Vercel and the bot worker. Use these commands from the repository root on the worker service:
+The local bot in `apps/bot/src/index.ts` uses Telegram long polling for `/start`, `/help`, and `chat_member` updates. To switch from production webhook mode back to local polling, stop any running bot process and run these commands from the repository root:
 
 ```bash
-pnpm --filter @hulu/bot build
-pnpm --filter @hulu/bot start
+pnpm --filter @hulu/bot delete-webhook
+pnpm --filter @hulu/bot dev
 ```
 
-Do not register Telegram's direct webhook while the polling bot is running. The current Mini App webhook route processes `chat_member` updates only; bot commands are handled by the polling worker.
+Keep the Mini App and Cloudflare Tunnel running while testing. Telegram does not allow long polling while a webhook is active.
+
+### Production: Vercel Mini App and Telegram webhook
+
+The Vercel route at `/api/webhooks/telegram` handles `/start`, `/help`, and channel-member updates. Telegram calls this route directly, so production does not need a separate always-on bot worker.
+
+Set `TELEGRAM_BOT_TOKEN`, `MINI_APP_URL` (the production Vercel URL), and `TELEGRAM_WEBHOOK_SECRET` in Vercel. Also put the bot token, production Mini App URL, and the exact same webhook secret in the root `.env.local` file. Stop any local polling bot, then register the HTTPS endpoint with Telegram from the repository root:
+
+```bash
+pnpm --filter @hulu/bot set-webhook
+```
+
+Do not run the polling bot while the webhook is active. Telegram sends its updates to the configured HTTPS URL and authenticates each request with the `TELEGRAM_WEBHOOK_SECRET` header.
 
 For Vercel, set the Root Directory to `apps/mini-app`, enable **Include source files outside of the Root Directory in the Build Step**, and use Node.js 24.x. Vercel can auto-detect the pnpm install from the root lockfile. Set the Build Command to:
 
@@ -96,7 +102,7 @@ cd ../.. && pnpm --filter @hulu/db db:generate && pnpm --filter @hulu/mini-app b
 
 ## 4. Environment Variables Checklist
 
-Add the Mini App variables in Vercel Project Settings → Environment Variables. Add the bot worker variables in the persistent worker service. Never commit .env.local or paste its secret values into source files.
+Add the Mini App variables in Vercel Project Settings → Environment Variables. For production, set `TELEGRAM_BOT_TOKEN`, `MINI_APP_URL`, and `TELEGRAM_WEBHOOK_SECRET` in Vercel, then copy those same values to the root `.env.local` before running the webhook registration command. Never commit `.env.local` or paste its secret values into source files.
 
 ```env
 DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true
