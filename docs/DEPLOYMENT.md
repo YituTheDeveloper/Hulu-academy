@@ -1,6 +1,6 @@
 # Hulu Academy — Deployment & Setup Guide
 
-This guide describes how to configure Telegram BotFather, register webhooks, set up Supabase PostgreSQL, and deploy Hulu Academy to production.
+This guide describes how to configure Telegram BotFather, set up Supabase PostgreSQL, and deploy the Mini App and bot to production.
 
 ---
 
@@ -73,30 +73,30 @@ Use one update-delivery mode at a time.
 
 The local bot in `apps/bot/src/index.ts` uses Telegram long polling for `chat_member` updates and forwards them to the Mini App at `MINI_APP_URL/api/webhooks/telegram`. Keep the bot, Mini App, and Cloudflare Tunnel running while testing. Do not register Telegram's direct webhook at the same time; Telegram does not allow long polling while a webhook is active. If this bot was previously configured with a webhook, remove it (preserving pending updates) before starting the local polling bot. `getWebhookInfo` should report an empty `url` for polling mode.
 
-### Production: direct Telegram webhook
+### Production: Vercel Mini App plus a persistent bot worker
 
-For a deployment that receives Telegram updates directly, stop the polling bot and register the webhook so Telegram sends membership updates to the public Mini App URL:
+Deploy `apps/mini-app` to Vercel. Run `apps/bot` as a persistent Node.js worker on a service that keeps processes running, such as Render, Railway, or a VPS. The bot uses long polling for `/start`, `/help`, and channel-member updates. For referral joins, it forwards `chat_member` updates to the Mini App's `/api/webhooks/telegram` endpoint.
+
+Configure the bot worker with `TELEGRAM_BOT_TOKEN`, `MINI_APP_URL` (the production Vercel URL), and `TELEGRAM_WEBHOOK_SECRET`. Set the same `TELEGRAM_WEBHOOK_SECRET` in Vercel and the bot worker. Use these commands from the repository root on the worker service:
 
 ```bash
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://your-domain.com/api/webhooks/telegram",
-    "secret_token": "<YOUR_WEBHOOK_SECRET>",
-    "allowed_updates": ["chat_member", "message", "callback_query"]
-  }'
+pnpm --filter @hulu/bot build
+pnpm --filter @hulu/bot start
 ```
 
-Verify webhook status:
+Do not register Telegram's direct webhook while the polling bot is running. The current Mini App webhook route processes `chat_member` updates only; bot commands are handled by the polling worker.
+
+For Vercel, set the Root Directory to `apps/mini-app`, enable **Include source files outside of the Root Directory in the Build Step**, and use Node.js 24.x. Vercel can auto-detect the pnpm install from the root lockfile. Set the Build Command to:
+
 ```bash
-curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo"
+cd ../.. && pnpm --filter @hulu/db db:generate && pnpm --filter @hulu/mini-app build
 ```
 
 ---
 
 ## 4. Environment Variables Checklist
 
-Ensure these variables are defined in your deployment environment (Vercel / Render / Railway):
+Add the Mini App variables in Vercel Project Settings → Environment Variables. Add the bot worker variables in the persistent worker service. Never commit .env.local or paste its secret values into source files.
 
 ```env
 DATABASE_URL=postgresql://postgres:[PASSWORD]@[HOST]:6543/postgres?pgbouncer=true
@@ -106,6 +106,8 @@ TELEGRAM_BOT_TOKEN=123456789:ABCdef...
 TELEGRAM_BOT_USERNAME=HuluAcademybot
 TELEGRAM_TARGET_CHAT_ID=-1001234567890
 TELEGRAM_WEBHOOK_SECRET=your-random-32-char-secret
+NEXT_PUBLIC_CHANNEL_USERNAME=HuluAcademy
+NEXT_PUBLIC_BOT_USERNAME=HuluAcademybot
 
 APP_URL=https://your-domain.com
 MINI_APP_URL=https://your-domain.com
