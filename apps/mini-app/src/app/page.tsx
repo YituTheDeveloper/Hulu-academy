@@ -353,21 +353,23 @@ function WelcomeScreen({ isAdmin, onOpen, onChannel }: { isAdmin: boolean; onOpe
     <div className="page-content animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingTop: 48 }}>
       {/* Hero */}
       <div style={{ textAlign: 'center', marginBottom: 8 }}>
-        <div style={{ position: 'relative', display: 'inline-block', marginBottom: 24 }}>
-          <div style={{
-            position: 'absolute', inset: -8,
-            background: 'radial-gradient(ellipse, rgba(212,175,55,0.25) 0%, transparent 70%)',
-            borderRadius: '50%',
-          }} />
-          <img
-            src="/hulu-logo.jpg"
-            alt="Hulu Academy"
-            style={{ width: 96, height: 96, borderRadius: '50%', border: '2px solid rgba(212,175,55,0.5)', position: 'relative', objectFit: 'cover' }}
-          />
+        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: 24 }}>
+          <div style={{ position: 'relative', width: 96, height: 96 }}>
+            <div style={{
+              position: 'absolute', inset: -8,
+              background: 'radial-gradient(ellipse, rgba(212,175,55,0.25) 0%, transparent 70%)',
+              borderRadius: '50%',
+            }} />
+            <img
+              src="/hulu-logo.jpg"
+              alt="Hulu Academy"
+              style={{ width: '100%', height: '100%', borderRadius: '50%', border: '2px solid rgba(212,175,55,0.5)', position: 'relative', objectFit: 'cover' }}
+            />
+          </div>
         </div>
 
-        <div className="badge badge-gold" style={{ marginBottom: 16, display: 'inline-flex' }}>
-          🎓 Freshman Second Semester
+        <div className="badge badge-gold" style={{ marginBottom: 16, maxWidth: '100%', justifyContent: 'center', whiteSpace: 'normal' }}>
+          🎓 Master Every Courses. Ace Every Exam. Reach 4.00. Join Your Dream Department
         </div>
 
         <h1 style={{ marginBottom: 12, lineHeight: 1.2 }}>
@@ -385,11 +387,11 @@ function WelcomeScreen({ isAdmin, onOpen, onChannel }: { isAdmin: boolean; onOpe
       {/* Features */}
       <div className="card stagger-children" style={{ gap: 12, display: 'flex', flexDirection: 'column' }}>
         {[
-          { icon: '📹', label: '4K Video Lectures' },
-          { icon: '📄', label: 'PDFs, Notes, Amharic & English' },
-          { icon: '📝', label: '4+ Years of Past Exams with Answers' },
-          { icon: '🧠', label: 'Chapter-wise Quizzes & Summaries' },
-          { icon: '🎯', label: 'Exam-focused Special Practice' },
+          { icon: '📹', label: 'UHD Video Mastery' },
+          { icon: '📄', label: 'Bilingual Concept Clarity' },
+          { icon: '📝', label: 'Proven Past Exams' },
+          { icon: '🧠', label: 'Quick Quiz & Recap' },
+          { icon: '🎯', label: 'Precision Exam Prep' },
         ].map(({ icon, label }) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: '1.25rem', width: 28 }}>{icon}</span>
